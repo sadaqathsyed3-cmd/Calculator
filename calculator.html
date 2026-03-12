@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS CALC — Cyberpunk Calculator</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  /* ─────────────────────────────────────────
+     CSS CUSTOM PROPERTIES
+  ───────────────────────────────────────── */
+  :root {
+    --bg-deep:        #020408;
+    --bg-panel:       rgba(4, 12, 24, 0.92);
+    --neon-blue:      #00d4ff;
+    --neon-cyan:      #00fff7;
+    --neon-purple:    #bf00ff;
+    --neon-pink:      #ff00aa;
+    --neon-green:     #00ff88;
+    --accent:         #00d4ff;
+    --accent2:        #bf00ff;
+    --text-bright:    #e0f8ff;
+    --text-dim:       #5a8fa0;
+    --btn-base:       rgba(0, 20, 40, 0.9);
+    --btn-op:         rgba(20, 0, 50, 0.9);
+    --btn-eq:         rgba(0, 60, 90, 0.95);
+    --btn-clear:      rgba(50, 0, 30, 0.9);
+    --shadow-glow:    0 0 30px rgba(0,212,255,0.25), 0 0 60px rgba(0,212,255,0.1);
+    --transition:     0.15s cubic-bezier(0.4,0,0.2,1);
+  }
+
+  .theme-light {
+    --bg-deep:        #e8f4f8;
+    --bg-panel:       rgba(220, 240, 255, 0.92);
+    --neon-blue:      #0066cc;
+    --neon-cyan:      #00aacc;
+    --neon-purple:    #8800cc;
+    --neon-pink:      #cc0077;
+    --neon-green:     #00aa55;
+    --accent:         #0066cc;
+    --accent2:        #8800cc;
+    --text-bright:    #002233;
+    --text-dim:       #3a6070;
+    --btn-base:       rgba(180, 220, 240, 0.85);
+    --btn-op:         rgba(200, 180, 240, 0.85);
+    --btn-eq:         rgba(160, 220, 250, 0.95);
+    --btn-clear:      rgba(240, 180, 210, 0.85);
+    --shadow-glow:    0 0 20px rgba(0,100,200,0.2), 0 0 40px rgba(0,100,200,0.08);
+  }
+
+  /* ─────────────────────────────────────────
+     RESET & BASE
+  ───────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    font-family: 'Orbitron', sans-serif;
+    background: var(--bg-deep);
+    transition: background 0.5s ease;
+  }
+
+  /* ─────────────────────────────────────────
+     ANIMATED BACKGROUND
+  ───────────────────────────────────────── */
+  #bg-canvas {
+    position: fixed; inset: 0; z-index: 0;
+    pointer-events: none;
+  }
+
+  /* ─────────────────────────────────────────
+     SCENE — 3D PERSPECTIVE WRAPPER
+  ───────────────────────────────────────── */
+  .scene {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 10;
+    perspective: 1200px;
+  }
+
+  /* ─────────────────────────────────────────
+     CALCULATOR BODY
+  ───────────────────────────────────────── */
+  .calculator {
+    position: relative;
+    width: clamp(300px, 90vw, 400px);
+    background: var(--bg-panel);
+    border-radius: 20px;
+    padding: 28px 22px 24px;
+    transform: rotateX(6deg) rotateY(-3deg);
+    transform-style: preserve-3d;
+    box-shadow:
+      0 50px 100px rgba(0,0,0,0.8),
+      0 20px 40px rgba(0,0,0,0.6),
+      0 0 0 1px rgba(0,212,255,0.15),
+      0 0 60px rgba(0,212,255,0.08),
+      inset 0 1px 0 rgba(255,255,255,0.08),
+      inset 0 -1px 0 rgba(0,0,0,0.5);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(0,212,255,0.2);
+    transition: transform 0.6s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.6s ease, background 0.5s ease, border-color 0.5s ease;
+    animation: floatIn 0.8s cubic-bezier(0.34,1.56,0.64,1) forwards;
+  }
+
+  .calculator:hover {
+    transform: rotateX(2deg) rotateY(0deg) translateY(-6px);
+    box-shadow:
+      0 70px 130px rgba(0,0,0,0.85),
+      0 30px 60px rgba(0,0,0,0.65),
+      0 0 0 1px rgba(0,212,255,0.3),
+      0 0 80px rgba(0,212,255,0.15),
+      inset 0 1px 0 rgba(255,255,255,0.1);
+  }
+
+  /* Glowing edge strip at top */
+  .calculator::before {
+    content: '';
+    position: absolute;
+    top: -1px; left: 10%; right: 10%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--neon-cyan), var(--neon-purple), var(--neon-cyan), transparent);
+    border-radius: 2px;
+    box-shadow: 0 0 15px var(--neon-cyan), 0 0 30px var(--neon-purple);
+    animation: edgePulse 3s ease-in-out infinite;
+  }
+
+  /* Bottom depth face for 3D illusion */
+  .calculator::after {
+    content: '';
+    position: absolute;
+    bottom: -14px; left: 4%; right: 4%;
+    height: 14px;
+    background: linear-gradient(to bottom, rgba(0,212,255,0.06), transparent);
+    border-radius: 0 0 20px 20px;
+    filter: blur(2px);
+    transform: translateZ(-2px);
+  }
+
+  @keyframes floatIn {
+    from { opacity: 0; transform: rotateX(25deg) rotateY(-8deg) translateY(60px) scale(0.9); }
+    to   { opacity: 1; transform: rotateX(6deg) rotateY(-3deg); }
+  }
+
+  @keyframes edgePulse {
+    0%, 100% { opacity: 0.7; }
+    50%       { opacity: 1; box-shadow: 0 0 25px var(--neon-cyan), 0 0 50px var(--neon-purple); }
+  }
+
+  /* ─────────────────────────────────────────
+     HEADER
+  ───────────────────────────────────────── */
+  .calc-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+
+  .calc-brand {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 4px;
+    color: var(--neon-cyan);
+    text-shadow: 0 0 10px var(--neon-cyan);
+    opacity: 0.8;
+  }
+
+  .calc-brand span { color: var(--neon-purple); text-shadow: 0 0 10px var(--neon-purple); }
+
+  /* Theme toggle */
+  .theme-toggle {
+    background: none; border: 1px solid rgba(0,212,255,0.3);
+    border-radius: 20px;
+    padding: 4px 10px;
+    cursor: pointer;
+    font-size: 10px;
+    font-family: 'Orbitron', sans-serif;
+    letter-spacing: 2px;
+    color: var(--text-dim);
+    transition: all 0.3s ease;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .theme-toggle:hover {
+    border-color: var(--neon-cyan);
+    color: var(--neon-cyan);
+    box-shadow: 0 0 10px rgba(0,212,255,0.3);
+  }
+  .theme-toggle .icon { font-size: 12px; }
+
+  /* ─────────────────────────────────────────
+     DISPLAY SCREEN
+  ───────────────────────────────────────── */
+  .display-wrap {
+    position: relative;
+    margin-bottom: 20px;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .display-wrap::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg,
+      rgba(255,255,255,0.06) 0%,
+      rgba(255,255,255,0) 50%,
+      rgba(0,212,255,0.04) 100%);
+    z-index: 2; pointer-events: none;
+    border-radius: 12px;
+  }
+
+  .display {
+    background: rgba(0, 8, 18, 0.95);
+    border: 1px solid rgba(0,212,255,0.2);
+    border-radius: 12px;
+    padding: 16px 18px 12px;
+    min-height: 110px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-shadow:
+      inset 0 4px 20px rgba(0,0,0,0.8),
+      inset 0 0 40px rgba(0,212,255,0.03),
+      0 0 0 1px rgba(0,0,0,0.5);
+    position: relative;
+    overflow: hidden;
+    transition: background 0.5s ease, border-color 0.5s ease;
+  }
+
+  .theme-light .display {
+    background: rgba(220, 240, 255, 0.9);
+    border-color: rgba(0,100,200,0.25);
+  }
+
+  /* Scanlines overlay */
+  .display::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 3px,
+      rgba(0,212,255,0.015) 3px,
+      rgba(0,212,255,0.015) 4px
+    );
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .display-expression {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    color: var(--text-dim);
+    min-height: 18px;
+    letter-spacing: 1px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    position: relative; z-index: 2;
+    transition: color 0.5s ease;
+  }
+
+  .display-value {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: clamp(28px, 8vw, 40px);
+    font-weight: 400;
+    color: var(--neon-cyan);
+    text-align: right;
+    letter-spacing: 2px;
+    text-shadow:
+      0 0 10px var(--neon-cyan),
+      0 0 25px rgba(0,255,247,0.4),
+      0 0 50px rgba(0,212,255,0.2);
+    position: relative; z-index: 2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1;
+    animation: textFlicker 8s ease-in-out infinite;
+    transition: color 0.5s ease, text-shadow 0.5s ease;
+  }
+
+  .theme-light .display-value {
+    text-shadow: 0 0 8px var(--neon-blue), 0 0 15px rgba(0,100,200,0.3);
+  }
+
+  .display-value.error { color: var(--neon-pink); text-shadow: 0 0 10px var(--neon-pink), 0 0 25px rgba(255,0,170,0.4); }
+  .display-value.flash { animation: valueFlash 0.3s ease; }
+
+  @keyframes textFlicker {
+    0%, 97%, 100%  { opacity: 1; }
+    98%            { opacity: 0.85; }
+    99%            { opacity: 1; }
+  }
+
+  @keyframes valueFlash {
+    0%   { transform: scale(1.02); }
+    50%  { transform: scale(1); color: var(--neon-green); }
+    100% { transform: scale(1); }
+  }
+
+  /* Status dot */
+  .display-status {
+    position: absolute; top: 10px; right: 12px;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--neon-green);
+    box-shadow: 0 0 8px var(--neon-green);
+    animation: statusBlink 2s ease-in-out infinite;
+    z-index: 3;
+  }
+  @keyframes statusBlink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.3; }
+  }
+
+  /* ─────────────────────────────────────────
+     BUTTON GRID
+  ───────────────────────────────────────── */
+  .btn-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+  }
+
+  /* ─────────────────────────────────────────
+     BUTTONS
+  ───────────────────────────────────────── */
+  .btn {
+    position: relative;
+    height: 58px;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    color: var(--text-bright);
+    background: var(--btn-base);
+    outline: none;
+    transition: all var(--transition);
+    transform-style: preserve-3d;
+    /* 3D raised button effect */
+    box-shadow:
+      0 6px 0 rgba(0,0,0,0.6),
+      0 8px 15px rgba(0,0,0,0.4),
+      inset 0 1px 0 rgba(255,255,255,0.08),
+      inset 0 -1px 0 rgba(0,0,0,0.4),
+      0 0 0 1px rgba(0,212,255,0.08);
+    overflow: hidden;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    transform: translateZ(0) translateY(0);
+  }
+
+  /* Shimmer / reflection layer */
+  .btn::before {
+    content: '';
+    position: absolute;
+    top: 0; left: -60%;
+    width: 40%; height: 100%;
+    background: linear-gradient(105deg, transparent, rgba(255,255,255,0.07), transparent);
+    transform: skewX(-20deg);
+    transition: left 0.5s ease;
+    pointer-events: none;
+  }
+
+  /* Top glow edge */
+  .btn::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: rgba(255,255,255,0.12);
+    pointer-events: none;
+  }
+
+  .btn:hover {
+    transform: translateY(-3px) translateZ(2px);
+    box-shadow:
+      0 9px 0 rgba(0,0,0,0.5),
+      0 12px 25px rgba(0,0,0,0.5),
+      inset 0 1px 0 rgba(255,255,255,0.12),
+      0 0 0 1px rgba(0,212,255,0.25),
+      0 0 20px rgba(0,212,255,0.1);
+    color: #fff;
+  }
+
+  .btn:hover::before { left: 120%; }
+
+  .btn:active, .btn.pressed {
+    transform: translateY(4px) translateZ(-2px) scale(0.98);
+    box-shadow:
+      0 2px 0 rgba(0,0,0,0.7),
+      0 3px 8px rgba(0,0,0,0.5),
+      inset 0 2px 6px rgba(0,0,0,0.5),
+      inset 0 1px 0 rgba(0,0,0,0.3);
+  }
+
+  /* OPERATOR BUTTONS */
+  .btn-op {
+    background: var(--btn-op);
+    color: var(--neon-purple);
+    text-shadow: 0 0 8px var(--neon-purple);
+    box-shadow:
+      0 6px 0 rgba(0,0,0,0.6),
+      0 8px 15px rgba(0,0,0,0.4),
+      inset 0 1px 0 rgba(255,255,255,0.08),
+      0 0 0 1px rgba(191,0,255,0.15);
+  }
+  .btn-op:hover {
+    color: #e0aaff;
+    text-shadow: 0 0 15px var(--neon-purple), 0 0 30px rgba(191,0,255,0.5);
+    box-shadow:
+      0 9px 0 rgba(0,0,0,0.5),
+      0 12px 25px rgba(0,0,0,0.4),
+      0 0 0 1px rgba(191,0,255,0.4),
+      0 0 25px rgba(191,0,255,0.15);
+  }
+
+  /* CLEAR BUTTON */
+  .btn-clear {
+    background: var(--btn-clear);
+    color: var(--neon-pink);
+    text-shadow: 0 0 8px var(--neon-pink);
+    box-shadow:
+      0 6px 0 rgba(0,0,0,0.6),
+      0 8px 15px rgba(0,0,0,0.4),
+      inset 0 1px 0 rgba(255,255,255,0.08),
+      0 0 0 1px rgba(255,0,170,0.15);
+  }
+  .btn-clear:hover {
+    color: #ffaadd;
+    text-shadow: 0 0 15px var(--neon-pink), 0 0 30px rgba(255,0,170,0.5);
+    box-shadow:
+      0 9px 0 rgba(0,0,0,0.5),
+      0 0 0 1px rgba(255,0,170,0.4),
+      0 0 25px rgba(255,0,170,0.15);
+  }
+
+  /* EQUALS BUTTON — spans 2 cols */
+  .btn-eq {
+    grid-column: span 2;
+    background: linear-gradient(135deg, rgba(0,80,120,0.9), rgba(0,50,90,0.9));
+    color: var(--neon-cyan);
+    font-size: 18px;
+    text-shadow: 0 0 12px var(--neon-cyan), 0 0 25px rgba(0,212,255,0.5);
+    box-shadow:
+      0 6px 0 rgba(0,0,0,0.6),
+      0 8px 20px rgba(0,0,0,0.5),
+      inset 0 1px 0 rgba(255,255,255,0.1),
+      0 0 0 1px rgba(0,212,255,0.25),
+      0 0 20px rgba(0,212,255,0.08);
+    letter-spacing: 3px;
+    border: 1px solid rgba(0,212,255,0.2);
+  }
+  .btn-eq:hover {
+    background: linear-gradient(135deg, rgba(0,100,150,0.95), rgba(0,70,120,0.95));
+    color: #aaffff;
+    text-shadow: 0 0 20px var(--neon-cyan), 0 0 40px rgba(0,212,255,0.6);
+    box-shadow:
+      0 9px 0 rgba(0,0,0,0.5),
+      0 12px 30px rgba(0,0,0,0.5),
+      0 0 0 1px rgba(0,212,255,0.5),
+      0 0 35px rgba(0,212,255,0.2);
+  }
+
+  /* ZERO — spans 2 cols */
+  .btn-zero { grid-column: span 2; }
+
+  /* DELETE / BACKSPACE */
+  .btn-del {
+    background: rgba(30, 10, 0, 0.9);
+    color: #ff8855;
+    text-shadow: 0 0 8px rgba(255,100,50,0.7);
+    font-size: 18px;
+    box-shadow:
+      0 6px 0 rgba(0,0,0,0.6),
+      0 8px 15px rgba(0,0,0,0.4),
+      inset 0 1px 0 rgba(255,255,255,0.08),
+      0 0 0 1px rgba(255,100,50,0.1);
+  }
+  .btn-del:hover {
+    color: #ffaa77;
+    box-shadow:
+      0 9px 0 rgba(0,0,0,0.5),
+      0 0 0 1px rgba(255,100,50,0.3),
+      0 0 20px rgba(255,100,50,0.12);
+  }
+
+  /* ─────────────────────────────────────────
+     RIPPLE
+  ───────────────────────────────────────── */
+  .ripple {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(0,212,255,0.25);
+    transform: scale(0);
+    animation: rippleAnim 0.5s linear;
+    pointer-events: none;
+    z-index: 5;
+  }
+  @keyframes rippleAnim {
+    to { transform: scale(4); opacity: 0; }
+  }
+
+  /* ─────────────────────────────────────────
+     KEYBOARD HINT
+  ───────────────────────────────────────── */
+  .kbd-hint {
+    margin-top: 14px;
+    text-align: center;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--text-dim);
+    opacity: 0.5;
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  /* ─────────────────────────────────────────
+     CORNER ACCENTS
+  ───────────────────────────────────────── */
+  .corner {
+    position: absolute;
+    width: 12px; height: 12px;
+    border-color: var(--neon-cyan);
+    border-style: solid;
+    opacity: 0.5;
+    pointer-events: none;
+    transition: border-color 0.5s ease;
+  }
+  .corner-tl { top: 8px; left: 8px;  border-width: 2px 0 0 2px; }
+  .corner-tr { top: 8px; right: 8px; border-width: 2px 2px 0 0; }
+  .corner-bl { bottom: 8px; left: 8px;  border-width: 0 0 2px 2px; }
+  .corner-br { bottom: 8px; right: 8px; border-width: 0 2px 2px 0; }
+
+  /* ─────────────────────────────────────────
+     RESPONSIVE
+  ───────────────────────────────────────── */
+  @media (max-height: 680px) {
+    .calculator { padding: 18px 16px 16px; }
+    .btn { height: 48px; font-size: 13px; }
+    .btn-grid { gap: 7px; }
+    .display { min-height: 90px; }
+    .display-value { font-size: 30px; }
+  }
+
+  @media (max-width: 360px) {
+    .calculator { width: calc(100vw - 24px); padding: 16px 14px; }
+    .btn { height: 52px; font-size: 13px; }
+    .btn-grid { gap: 8px; }
+  }
+
+  /* ─────────────────────────────────────────
+     SCROLLBAR (for overflow)
+  ───────────────────────────────────────── */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--neon-blue); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- Animated Background Canvas -->
+<canvas id="bg-canvas"></canvas>
+
+<!-- 3D Scene -->
+<div class="scene">
+  <div class="calculator" id="calculator">
+    <!-- Corner accents -->
+    <div class="corner corner-tl"></div>
+    <div class="corner corner-tr"></div>
+    <div class="corner corner-bl"></div>
+    <div class="corner corner-br"></div>
+
+    <!-- Header -->
+    <div class="calc-header">
+      <div class="calc-brand">NEXUS<span>X</span>&nbsp;CALC</div>
+      <button class="theme-toggle" id="themeToggle">
+        <span class="icon" id="themeIcon">☀</span>
+        <span id="themeLabel">LIGHT</span>
+      </button>
+    </div>
+
+    <!-- Display -->
+    <div class="display-wrap">
+      <div class="display">
+        <div class="display-status"></div>
+        <div class="display-expression" id="expression"></div>
+        <div class="display-value" id="display">0</div>
+      </div>
+    </div>
+
+    <!-- Button Grid -->
+    <div class="btn-grid">
+      <!-- Row 1 -->
+      <button class="btn btn-clear" data-action="clear">C</button>
+      <button class="btn btn-del"   data-action="delete">⌫</button>
+      <button class="btn btn-op"    data-action="operator" data-value="%">%</button>
+      <button class="btn btn-op"    data-action="operator" data-value="/">÷</button>
+
+      <!-- Row 2 -->
+      <button class="btn" data-action="digit" data-value="7">7</button>
+      <button class="btn" data-action="digit" data-value="8">8</button>
+      <button class="btn" data-action="digit" data-value="9">9</button>
+      <button class="btn btn-op" data-action="operator" data-value="*">×</button>
+
+      <!-- Row 3 -->
+      <button class="btn" data-action="digit" data-value="4">4</button>
+      <button class="btn" data-action="digit" data-value="5">5</button>
+      <button class="btn" data-action="digit" data-value="6">6</button>
+      <button class="btn btn-op" data-action="operator" data-value="-">−</button>
+
+      <!-- Row 4 -->
+      <button class="btn" data-action="digit" data-value="1">1</button>
+      <button class="btn" data-action="digit" data-value="2">2</button>
+      <button class="btn" data-action="digit" data-value="3">3</button>
+      <button class="btn btn-op" data-action="operator" data-value="+">+</button>
+
+      <!-- Row 5 -->
+      <button class="btn btn-zero" data-action="digit"    data-value="0">0</button>
+      <button class="btn"          data-action="decimal">.</button>
+      <button class="btn btn-eq"   data-action="equals">=</button>
+    </div>
+
+    <div class="kbd-hint">⌨ KEYBOARD INPUT SUPPORTED</div>
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════
+   BACKGROUND CANVAS — ANIMATED GRID + PARTICLES
+══════════════════════════════════════════════ */
+(function() {
+  const canvas = document.getElementById('bg-canvas');
+  const ctx    = canvas.getContext('2d');
+  let W, H, particles = [], isLight = false;
+
+  function resize() {
+    W = canvas.width  = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+
+  function makeParticle() {
+    return {
+      x: Math.random() * W,
+      y: Math.random() * H,
+      r: Math.random() * 1.5 + 0.3,
+      vx: (Math.random() - 0.5) * 0.3,
+      vy: (Math.random() - 0.5) * 0.3,
+      alpha: Math.random() * 0.6 + 0.1,
+      color: Math.random() > 0.5 ? '#00d4ff' : '#bf00ff'
+    };
+  }
+
+  function init() {
+    resize();
+    particles = Array.from({ length: 80 }, makeParticle);
+  }
+
+  let t = 0;
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    t += 0.005;
+
+    // Grid lines
+    const gridAlpha = isLight ? 0.04 : 0.06;
+    const gridColor = isLight ? '#0066cc' : '#00d4ff';
+    ctx.strokeStyle = gridColor;
+    ctx.lineWidth = 0.5;
+
+    // Perspective grid (bottom vanishing point)
+    const vx = W / 2, vy = H * 0.65;
+    const cols = 20, rows = 15;
+    ctx.globalAlpha = gridAlpha;
+    for (let i = 0; i <= cols; i++) {
+      const x = (i / cols) * W;
+      ctx.beginPath(); ctx.moveTo(x, 0);
+      ctx.lineTo(vx + (x - vx) * 0.1, vy);
+      ctx.stroke();
+    }
+    for (let j = 1; j <= rows; j++) {
+      const progress = j / rows;
+      const spread = progress * 0.9 + 0.1;
+      ctx.beginPath();
+      ctx.moveTo(vx - (W / 2) * spread * 1.2, H * progress * 0.7);
+      ctx.lineTo(vx + (W / 2) * spread * 1.2, H * progress * 0.7);
+      ctx.stroke();
+    }
+
+    // Horizontal scan line
+    const scanY = (Math.sin(t * 0.5) * 0.5 + 0.5) * H;
+    const grad = ctx.createLinearGradient(0, scanY - 80, 0, scanY + 80);
+    grad.addColorStop(0, 'transparent');
+    grad.addColorStop(0.5, isLight ? 'rgba(0,100,200,0.04)' : 'rgba(0,212,255,0.05)');
+    grad.addColorStop(1, 'transparent');
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, scanY - 80, W, 160);
+
+    // Particles
+    particles.forEach(p => {
+      p.x += p.vx; p.y += p.vy;
+      if (p.x < 0 || p.x > W) p.vx *= -1;
+      if (p.y < 0 || p.y > H) p.vy *= -1;
+      ctx.globalAlpha = p.alpha * (isLight ? 0.5 : 1);
+      ctx.fillStyle = p.color;
+      ctx.shadowColor = p.color;
+      ctx.shadowBlur = isLight ? 4 : 8;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // Connect nearby particles
+    ctx.shadowBlur = 0;
+    for (let i = 0; i < particles.length; i++) {
+      for (let j = i + 1; j < particles.length; j++) {
+        const dx = particles[i].x - particles[j].x;
+        const dy = particles[i].y - particles[j].y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 100) {
+          ctx.globalAlpha = (1 - dist / 100) * 0.12 * (isLight ? 0.4 : 1);
+          ctx.strokeStyle = isLight ? '#0066cc' : '#00d4ff';
+          ctx.lineWidth = 0.5;
+          ctx.beginPath();
+          ctx.moveTo(particles[i].x, particles[i].y);
+          ctx.lineTo(particles[j].x, particles[j].y);
+          ctx.stroke();
+        }
+      }
+    }
+
+    ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+    requestAnimationFrame(draw);
+  }
+
+  window.addEventListener('resize', resize);
+  init(); draw();
+
+  // Expose for theme toggle
+  window._bgSetLight = (v) => { isLight = v; };
+})();
+
+/* ══════════════════════════════════════════════
+   AUDIO ENGINE — WEB AUDIO API
+══════════════════════════════════════════════ */
+const Audio = (() => {
+  let ctx;
+  function getCtx() {
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    return ctx;
+  }
+
+  function beep(freq = 440, type = 'sine', duration = 0.06, vol = 0.08) {
+    try {
+      const ac = getCtx();
+      const osc = ac.createOscillator();
+      const gain = ac.createGain();
+      osc.connect(gain); gain.connect(ac.destination);
+      osc.frequency.value = freq;
+      osc.type = type;
+      gain.gain.setValueAtTime(vol, ac.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + duration);
+      osc.start(ac.currentTime);
+      osc.stop(ac.currentTime + duration);
+    } catch(e) {}
+  }
+
+  return {
+    digit:    () => beep(880, 'sine', 0.05, 0.06),
+    operator: () => beep(660, 'triangle', 0.07, 0.07),
+    equals:   () => { beep(1046, 'sine', 0.1, 0.1); setTimeout(() => beep(1318, 'sine', 0.1, 0.08), 80); },
+    clear:    () => beep(330, 'sawtooth', 0.1, 0.05),
+    error:    () => beep(220, 'sawtooth', 0.2, 0.06),
+    del:      () => beep(500, 'sine', 0.04, 0.04),
+  };
+})();
+
+/* ══════════════════════════════════════════════
+   CALCULATOR STATE & LOGIC
+══════════════════════════════════════════════ */
+const Calc = (() => {
+  let current = '0', prev = '', operator = null, shouldResetDisplay = false, justEqualled = false;
+
+  const display    = document.getElementById('display');
+  const expression = document.getElementById('expression');
+
+  function update(val, isErr = false) {
+    display.classList.remove('error', 'flash');
+    void display.offsetWidth; // force reflow for re-animation
+    display.textContent = val;
+    display.classList.toggle('error', isErr);
+    if (!isErr) display.classList.add('flash');
+  }
+
+  function updateExpr(val) { expression.textContent = val; }
+
+  function formatNum(n) {
+    if (!isFinite(n)) return 'ERROR';
+    const s = parseFloat(n.toPrecision(12)).toString();
+    return s.length > 15 ? parseFloat(n.toExponential(6)).toString() : s;
+  }
+
+  const ops = {
+    '+': (a, b) => a + b,
+    '-': (a, b) => a - b,
+    '*': (a, b) => a * b,
+    '/': (a, b) => b === 0 ? null : a / b,
+    '%': (a, b) => a % b,
+  };
+
+  const api = {
+    digit(v) {
+      if (shouldResetDisplay || justEqualled) {
+        current = v === '.' ? '0.' : v;
+        shouldResetDisplay = false; justEqualled = false;
+      } else {
+        if (current.length >= 16) return;
+        current = current === '0' ? v : current + v;
+      }
+      update(current);
+    },
+
+    decimal() {
+      if (shouldResetDisplay || justEqualled) { current = '0.'; shouldResetDisplay = false; justEqualled = false; }
+      else if (!current.includes('.')) current += '.';
+      update(current);
+    },
+
+    operator(op) {
+      const cur = parseFloat(current);
+      if (operator && !shouldResetDisplay) {
+        const res = ops[operator](parseFloat(prev), cur);
+        if (res === null) { update('DIV/ZERO', true); updateExpr(''); prev = ''; operator = null; return; }
+        prev = formatNum(res);
+        update(prev);
+      } else {
+        prev = current;
+      }
+      operator = op;
+      shouldResetDisplay = true; justEqualled = false;
+      const symbols = { '+':'+', '-':'−', '*':'×', '/':'÷', '%':'%' };
+      updateExpr(`${prev} ${symbols[op]}`);
+    },
+
+    equals() {
+      if (!operator || !prev) return;
+      const a = parseFloat(prev), b = parseFloat(current);
+      const symbols = { '+':'+', '-':'−', '*':'×', '/':'÷', '%':'%' };
+      const exprStr = `${prev} ${symbols[operator]} ${current} =`;
+      const res = ops[operator](a, b);
+      if (res === null) {
+        update('DIV/ZERO', true); updateExpr(exprStr);
+        Audio.error(); operator = null; prev = ''; return;
+      }
+      const formatted = formatNum(res);
+      update(formatted); updateExpr(exprStr);
+      current = formatted; operator = null; prev = '';
+      justEqualled = true; shouldResetDisplay = false;
+    },
+
+    clear() {
+      current = '0'; prev = ''; operator = null;
+      shouldResetDisplay = false; justEqualled = false;
+      update('0'); updateExpr('');
+    },
+
+    delete() {
+      if (shouldResetDisplay || justEqualled) { api.clear(); return; }
+      current = current.length > 1 ? current.slice(0, -1) : '0';
+      update(current);
+    }
+  };
+
+  return api;
+})();
+
+/* ══════════════════════════════════════════════
+   BUTTON INTERACTIONS + RIPPLE
+══════════════════════════════════════════════ */
+function createRipple(btn, e) {
+  const rect = btn.getBoundingClientRect();
+  const x = (e.clientX || rect.left + rect.width / 2) - rect.left;
+  const y = (e.clientY || rect.top + rect.height / 2) - rect.top;
+  const size = Math.max(rect.width, rect.height) * 1.5;
+  const ripple = document.createElement('span');
+  ripple.className = 'ripple';
+  ripple.style.cssText = `
+    width:${size}px;height:${size}px;
+    left:${x - size/2}px;top:${y - size/2}px;`;
+  btn.appendChild(ripple);
+  ripple.addEventListener('animationend', () => ripple.remove());
+}
+
+document.querySelectorAll('.btn').forEach(btn => {
+  btn.addEventListener('pointerdown', (e) => {
+    createRipple(btn, e);
+    btn.classList.add('pressed');
+
+    const action = btn.dataset.action;
+    const value  = btn.dataset.value;
+
+    switch(action) {
+      case 'digit':    Calc.digit(value);    Audio.digit();    break;
+      case 'operator': Calc.operator(value); Audio.operator(); break;
+      case 'equals':   Calc.equals();        Audio.equals();   break;
+      case 'clear':    Calc.clear();         Audio.clear();    break;
+      case 'delete':   Calc.delete();        Audio.del();      break;
+      case 'decimal':  Calc.decimal();       Audio.digit();    break;
+    }
+  });
+
+  btn.addEventListener('pointerup', () => btn.classList.remove('pressed'));
+  btn.addEventListener('pointerleave', () => btn.classList.remove('pressed'));
+});
+
+/* ══════════════════════════════════════════════
+   KEYBOARD INPUT
+══════════════════════════════════════════════ */
+const keyMap = {
+  '0':'0','1':'1','2':'2','3':'3','4':'4',
+  '5':'5','6':'6','7':'7','8':'8','9':'9',
+  '+':'+','-':'-','*':'*','/':'/',
+  'Enter':'=','=':'=',
+  'Backspace':'del','Delete':'clear','Escape':'clear',
+  '.':'.', '%':'%'
+};
+
+document.addEventListener('keydown', (e) => {
+  const k = keyMap[e.key];
+  if (!k) return;
+  e.preventDefault();
+
+  // Find matching button to animate
+  let selector = null;
+  if ('0123456789'.includes(k)) selector = `[data-value="${k}"]`;
+  else if ('+-*/%'.includes(k))  selector = `[data-value="${k}"]`;
+  else if (k === '=')            selector = '[data-action="equals"]';
+  else if (k === 'del')          selector = '[data-action="delete"]';
+  else if (k === 'clear')        selector = '[data-action="clear"]';
+  else if (k === '.')            selector = '[data-action="decimal"]';
+
+  if (selector) {
+    const btn = document.querySelector(`.btn${selector}`);
+    if (btn) {
+      btn.classList.add('pressed');
+      createRipple(btn, {});
+      setTimeout(() => btn.classList.remove('pressed'), 120);
+    }
+  }
+
+  if ('0123456789'.includes(k)) { Calc.digit(k); Audio.digit(); }
+  else if (k === '.') { Calc.decimal(); Audio.digit(); }
+  else if (['+','-','*','/',  '%'].includes(k)) { Calc.operator(k); Audio.operator(); }
+  else if (k === '=') { Calc.equals(); Audio.equals(); }
+  else if (k === 'del') { Calc.delete(); Audio.del(); }
+  else if (k === 'clear') { Calc.clear(); Audio.clear(); }
+});
+
+/* ══════════════════════════════════════════════
+   THEME TOGGLE
+══════════════════════════════════════════════ */
+let lightMode = false;
+document.getElementById('themeToggle').addEventListener('click', () => {
+  lightMode = !lightMode;
+  document.body.classList.toggle('theme-light', lightMode);
+  document.getElementById('themeIcon').textContent  = lightMode ? '🌙' : '☀';
+  document.getElementById('themeLabel').textContent = lightMode ? 'DARK' : 'LIGHT';
+  window._bgSetLight && window._bgSetLight(lightMode);
+});
+
+/* ══════════════════════════════════════════════
+   3D TILT ON MOUSE MOVE
+══════════════════════════════════════════════ */
+const calc = document.getElementById('calculator');
+document.addEventListener('mousemove', (e) => {
+  const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
+  const dx = (e.clientX - cx) / cx; // -1 to 1
+  const dy = (e.clientY - cy) / cy;
+  const rx = -dy * 5 + 2;           // subtle tilt
+  const ry = dx * 4 - 2;
+  calc.style.transform = `rotateX(${rx}deg) rotateY(${ry}deg)`;
+});
+
+document.addEventListener('mouseleave', () => {
+  calc.style.transform = 'rotateX(6deg) rotateY(-3deg)';
+});
+</script>
+</body>
+</html>
